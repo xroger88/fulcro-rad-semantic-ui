@@ -7,6 +7,7 @@
     [com.fulcrologic.rad.form :as form]
     [com.fulcrologic.rad.attributes :as attr]
     [com.fulcrologic.rad.ui-validation :as validation]
+    [taoensso.timbre :as log]
     [com.fulcrologic.rad.rendering.semantic-ui.components :refer [ui-wrapped-dropdown]]
     [com.fulcrologic.rad.rendering.semantic-ui.field :refer [render-field-factory]]))
 
