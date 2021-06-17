@@ -42,8 +42,7 @@
                                                                 attributes (comp/component-options ui ::form/attributes)
                                                                 id-attr    (comp/component-options ui ::form/id)
                                                                 id-key     (::attr/qualified-key id-attr)
-                                                                {::attr/keys [qualified-key] :as sha-attr} (first (filter ::blob/store
-                                                                                                                    attributes))
+                                                                {::attr/keys [qualified-key] :as sha-attr} (first (filter ::blob/store attributes))
                                                                 target     (conj (comp/get-ident form-instance) k)
                                                                 new-entity (fs/add-form-config ui
                                                                              {id-key        new-id
@@ -154,8 +153,10 @@
                               (dom/div
                                 (dom/label :.ui.green.button {:htmlFor upload-id}
                                   (dom/i :.ui.plus.icon)
-                                  (tr "Add File"))
+                                  (tr "Add Files"))
                                 (dom/input {:type     "file"
+                                            ;; FIXME added by xroger88 to support multiple file uploads
+                                            :multiple true
                                             ;; trick: changing the key on change clears the input, so a failed upload can be retried
                                             :key      (comp/get-state this :input-key)
                                             :id       upload-id
@@ -164,20 +165,19 @@
                                                        :height  "1px"
                                                        :opacity 0}
                                             :onChange (fn [evt]
-                                                        (let [new-id     (tempid/tempid)
-                                                              js-file    (-> evt blob/evt->js-files first)
-                                                              attributes (comp/component-options ui ::form/attributes)
+                                                        ;; FIXME changed by xroger88 to support multiple file uploads
+                                                        (let [attributes (comp/component-options ui ::form/attributes)
                                                               id-attr    (comp/component-options ui ::form/id)
                                                               id-key     (::attr/qualified-key id-attr)
-                                                              {::attr/keys [qualified-key] :as sha-attr} (first (filter ::blob/store
-                                                                                                                  attributes))
-                                                              target     (conj (comp/get-ident form-instance) k)
-                                                              new-entity (fs/add-form-config ui
-                                                                           {id-key        new-id
-                                                                            qualified-key ""})]
-                                                          (merge/merge-component! form-instance ui new-entity :append target)
-                                                          (blob/upload-file! form-instance sha-attr js-file {:file-ident [id-key new-id]})
-                                                          (comp/set-state! this {:input-key (str (rand-int 1000000))})))})))
+                                                              {::attr/keys [qualified-key] :as sha-attr} (first (filter ::blob/store attributes))
+                                                              target     (conj (comp/get-ident form-instance) k)]
+                                                          (doseq [js-file (-> evt blob/evt->js-files)]
+                                                            (let [new-id     (tempid/tempid)
+                                                                  new-entity (fs/add-form-config ui {id-key        new-id
+                                                                                                     qualified-key ""})]
+                                                              (merge/merge-component! form-instance ui new-entity :append target)
+                                                              (blob/upload-file! form-instance sha-attr js-file {:file-ident [id-key new-id]}))))
+                                                          (comp/set-state! this {:input-key (str (rand-int 1000000))}))})))
         ui-factory          (comp/computed-factory ui {:keyfn (fn [item] (-> ui (comp/get-ident item) second str))})]
     (div :.ui.basic.segment {:key (str k)}
       (dom/h2 :.ui.header title)
