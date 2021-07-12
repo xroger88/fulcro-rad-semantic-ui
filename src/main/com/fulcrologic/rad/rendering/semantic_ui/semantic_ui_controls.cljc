@@ -43,6 +43,7 @@
               :viewable-password                    text-field/render-viewable-password
               :password                             text-field/render-password
               :sorted-set                           text-field/render-dropdown
+              :input-action                         text-field/render-input-action
               :com.fulcrologic.rad.blob/file-upload blob-field/render-file-upload}
     :int     {:default int-field/render-field
               :picker  enumerated-field/render-field}

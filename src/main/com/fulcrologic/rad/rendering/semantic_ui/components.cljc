@@ -90,3 +90,15 @@
   a number of things (:search, :closeOnBlue, openOnFocus, selectOnBlue, and :selectOnNavigation) to true, but you can"
   (comp/factory WrappedDropdown))
 
+(defsc WrappedInputAction [this {:keys [onChange value form-instance onClick] :as props}]
+  #?(:cljs
+     (dom/div :.ui.action.input
+              (dom/input {:type "text" :value value
+                          :onChange (fn [evt] (onChange (.. evt -target -value)))})
+              (dom/button :.ui.teal.right.labeled.icon.button {:onClick (fn [] #_(js/alert props) (onClick form-instance value))}
+                          (dom/i :.check.icon) "Check")
+              )))
+
+(def ui-wrapped-input-action
+  "Draw a SUI input action with the given props."
+  (comp/factory WrappedInputAction))
