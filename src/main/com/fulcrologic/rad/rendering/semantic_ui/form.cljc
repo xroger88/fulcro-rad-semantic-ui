@@ -206,6 +206,71 @@
     (ui-many-files {:env env :attribute attr :options options})
     (render-single-file env attr options)))
 
+
+(defsc NotebookCells [this {{::form/keys [form-instance master-form] :as env} :env
+                        {k ::attr/qualified-key :as attr}                 :attribute
+                        {::form/keys [subforms] :as options}              :options}]
+  {:initLocalState (fn [this] {:xxx 1})}
+  (let [{:semantic-ui/keys [add-position]
+         ::form/keys       [ui title can-delete? can-add? sort-children]} (get subforms k)
+        form-instance-props (comp/props form-instance)
+        read-only?          (or
+                              (form/read-only? master-form attr)
+                              (form/read-only? form-instance attr))
+        add?                (if read-only? false (?! can-add? form-instance attr))
+        delete?             (if read-only? false (fn [item] (?! can-delete? form-instance item)))
+        items               (-> form-instance comp/props k
+                              (cond-> sort-children sort-children))
+        title               (?! (or title (some-> ui (comp/component-options ::form/title)) "") form-instance form-instance-props)
+        add                 (when (or (nil? add?) add?)
+                              (dom/div
+                               (dom/button :.ui.green.plus.button
+                                           {:onClick (fn [evt]
+                                                       (let [form-id-attr (comp/component-options ui ::form/id)
+                                                             form-id-key (::attr/qualified-key form-id-attr)
+                                                             new-id     (tempid/tempid)
+                                                             new-entity (fs/add-form-config ui {form-id-key new-id})
+                                                             target (conj (comp/get-ident form-instance) k)]
+                                                         (merge/merge-component! form-instance ui new-entity :prepend target)))
+                                            } "Add at first")
+                               (dom/button :.ui.green.plus.button
+                                           {:onClick (fn [evt]
+                                                       (let [form-id-attr (comp/component-options ui ::form/id)
+                                                             form-id-key (::attr/qualified-key form-id-attr)
+                                                             new-id     (tempid/tempid)
+                                                             new-entity (fs/add-form-config ui {form-id-key new-id})
+                                                             target (conj (comp/get-ident form-instance) k)]
+                                                         (merge/merge-component! form-instance ui new-entity :append target)))
+                                            } "Add at last")))
+       ui-factory          (comp/computed-factory ui {:keyfn (fn [item] (-> ui (comp/get-ident item) second str))})]
+    (div :.ui.basic.segment {:key (str k)}
+         (dom/h2 :.ui.header title)
+         (when (or (nil? add-position) (= :top add-position)) add)
+         (if (seq items)
+           (div :.ui.very.relaxed.items
+                (mapv
+                 (fn [props]
+                   (ui-factory props
+                               (merge
+                                env
+                                {::form/form-class      ui
+                                 ::form/parent          form-instance
+                                 ::form/parent-relation k
+                                 ::form/can-delete?     (if delete? (?! delete? props) false)})))
+                 items))
+           (div :.ui.message
+                (trc "there are no cells in notebook" "No cells.")))
+         (when (= :bottom add-position) add))))
+
+(def ui-notebook-cells (comp/factory NotebookCells {:keyfn (fn [{:keys [attribute]}] (::attr/qualified-key attribute))}))
+
+;; FIXME added by xroger88
+(defn notebook-cell-ref-container
+  [env {::attr/keys [cardinality] :as attr} options]
+  (if (= :many cardinality)
+    (ui-notebook-cells {:env env :attribute attr :options options})
+    (render-single-file env attr options)))
+
 (defn render-attribute [env attr {::form/keys [subforms] :as options}]
   (let [{k ::attr/qualified-key} attr]
     (if (contains? subforms k)
