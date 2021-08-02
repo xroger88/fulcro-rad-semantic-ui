@@ -206,13 +206,33 @@
     (ui-many-files {:env env :attribute attr :options options})
     (render-single-file env attr options)))
 
+(defn render-notebook-cell [{::form/keys [form-instance] :as env} {k ::attr/qualified-key :as attr} {::form/keys [subforms] :as options}]
+  (let [{::form/keys [ui can-delete?]} (get subforms k)
+        parent     (comp/props form-instance)
+        form-props (comp/props form-instance)
+        props      (get form-props k)
+        ui-factory (comp/computed-factory ui)
+        label      (form/field-label env attr)
+        std-props  {::form/nested?         true
+                    ::form/form-class      ui
+                    ::form/parent          form-instance
+                    ::form/parent-relation k
+                    ::form/can-delete?     (if can-delete?
+                                             (can-delete? parent props)
+                                             false)}]
+    (if props
+      (div :.field {:key (str k)}
+        (dom/label label)
+        (ui-factory props (merge env std-props)))
+      (div {:key (str k)}
+        (div (tr "Cell??? (TODO)"))))))
 
 (defsc NotebookCells [this {{::form/keys [form-instance master-form] :as env} :env
-                        {k ::attr/qualified-key :as attr}                 :attribute
-                        {::form/keys [subforms] :as options}              :options}]
+                            {k ::attr/qualified-key :as attr}                 :attribute
+                            {::form/keys [subforms] :as options}              :options}]
   {:initLocalState (fn [this] {:xxx 1})}
   (let [{:semantic-ui/keys [add-position]
-         ::form/keys       [ui title can-delete? can-add? sort-children]} (get subforms k)
+         ::form/keys       [ui position-key title can-delete? can-add? sort-children]} (get subforms k)
         form-instance-props (comp/props form-instance)
         read-only?          (or
                               (form/read-only? master-form attr)
@@ -222,24 +242,39 @@
         items               (-> form-instance comp/props k
                               (cond-> sort-children sort-children))
         title               (?! (or title (some-> ui (comp/component-options ::form/title)) "") form-instance form-instance-props)
+        state-map           (comp/component->state-map this)
         add                 (when (or (nil? add?) add?)
                               (dom/div
                                (dom/button :.ui.green.plus.button
                                            {:onClick (fn [evt]
                                                        (let [form-id-attr (comp/component-options ui ::form/id)
                                                              form-id-key (::attr/qualified-key form-id-attr)
+                                                             target (conj (comp/get-ident form-instance) k)
                                                              new-id     (tempid/tempid)
-                                                             new-entity (fs/add-form-config ui {form-id-key new-id})
-                                                             target (conj (comp/get-ident form-instance) k)]
+                                                             new-entity-data {form-id-key new-id}
+                                                             new-entity-data (if (nil? position-key) new-entity-data
+                                                                               (let [cells (get-in state-map target [])
+                                                                                     pos (reduce (fn [min c-ident]
+                                                                                                   (let [c-pos (get-in state-map (conj c-ident position-key) 0)]
+                                                                                                     (if (< c-pos min) c-pos min))) 10000 cells)]
+                                                                                 (assoc new-entity-data position-key (- pos 1))))
+                                                             new-entity (fs/add-form-config ui new-entity-data)]
                                                          (merge/merge-component! form-instance ui new-entity :prepend target)))
                                             } "Add at first")
                                (dom/button :.ui.green.plus.button
                                            {:onClick (fn [evt]
                                                        (let [form-id-attr (comp/component-options ui ::form/id)
                                                              form-id-key (::attr/qualified-key form-id-attr)
+                                                             target (conj (comp/get-ident form-instance) k)
                                                              new-id     (tempid/tempid)
-                                                             new-entity (fs/add-form-config ui {form-id-key new-id})
-                                                             target (conj (comp/get-ident form-instance) k)]
+                                                             new-entity-data {form-id-key new-id}
+                                                             new-entity-data (if (nil? position-key) new-entity-data
+                                                                               (let [cells (get-in state-map target [])
+                                                                                     pos (reduce (fn [max c-ident]
+                                                                                                   (let [c-pos (get-in state-map (conj c-ident position-key) 0)]
+                                                                                                     (if (> c-pos max) c-pos max))) -10000 cells)]
+                                                                                 (assoc new-entity-data position-key (+ pos 1))))
+                                                             new-entity (fs/add-form-config ui new-entity-data)]
                                                          (merge/merge-component! form-instance ui new-entity :append target)))
                                             } "Add at last")))
        ui-factory          (comp/computed-factory ui {:keyfn (fn [item] (-> ui (comp/get-ident item) second str))})]
@@ -269,7 +304,7 @@
   [env {::attr/keys [cardinality] :as attr} options]
   (if (= :many cardinality)
     (ui-notebook-cells {:env env :attribute attr :options options})
-    (render-single-file env attr options)))
+    (render-notebook-cell env attr options)))
 
 (defn render-attribute [env attr {::form/keys [subforms] :as options}]
   (let [{k ::attr/qualified-key} attr]
