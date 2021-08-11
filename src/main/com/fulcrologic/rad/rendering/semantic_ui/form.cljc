@@ -101,11 +101,13 @@
 
       (or (nil? can-add?) (?! can-add? form-instance attr))
       (div {:key (str k) :classes [(?! ref-container-class env)]}
-        (h3 :.ui.header title)
-        (button :.ui.primary.button {:onClick (fn [] (form/add-child! (assoc env
-                                                                        ::form/parent-relation k
-                                                                        ::form/parent form-instance
-                                                                        ::form/child-class ui)))} (tr "Create"))))))
+           (h3 :.ui.header title)
+           ;; FIXME added by xroger88 to fix ::form/order as :replace for the attribute field with one cardinality
+           (button :.ui.primary.button {:onClick (fn [] (form/add-child! (assoc env
+                                                                                ::form/order :replace
+                                                                                ::form/parent-relation k
+                                                                                ::form/parent form-instance
+                                                                                ::form/child-class ui)))} (tr "Create"))))))
 
 (defn standard-ref-container [env {::attr/keys [cardinality] :as attr} options]
   (if (= :many cardinality)
@@ -207,25 +209,38 @@
     (render-single-file env attr options)))
 
 (defn render-notebook-cell [{::form/keys [form-instance] :as env} {k ::attr/qualified-key :as attr} {::form/keys [subforms] :as options}]
-  (let [{::form/keys [ui can-delete?]} (get subforms k)
-        parent     (comp/props form-instance)
+  (let [{::form/keys [ui can-add? can-delete? title ref-container-class]} (get subforms k)
         form-props (comp/props form-instance)
         props      (get form-props k)
+        title      (?! (or title (some-> ui (comp/component-options ::form/title)) "") form-instance form-props)
         ui-factory (comp/computed-factory ui)
-        label      (form/field-label env attr)
+        invalid?           (validation/invalid-attribute-value? env attr)
+        validation-message (validation/validation-error-message env attr)
+        ;label      (form/field-label env attr)
         std-props  {::form/nested?         true
-                    ::form/form-class      ui
+                    ::form/child-class      ui
                     ::form/parent          form-instance
                     ::form/parent-relation k
                     ::form/can-delete?     (if can-delete?
-                                             (can-delete? parent props)
+                                             (can-delete? form-instance props)
                                              false)}]
-    (if props
-      (div :.field {:key (str k)}
-        (dom/label label)
+    ;(log/debug "*** form-props" form-props props k can-add?)
+    (cond
+      props
+      (div {:key (str k) :classes [(?! ref-container-class env)]}
+        (h3 :.ui.header title)
+        (when invalid?
+          (div :.ui.error.message validation-message))
         (ui-factory props (merge env std-props)))
-      (div {:key (str k)}
-        (div (tr "Cell??? (TODO)"))))))
+
+      (or (nil? can-add?) (?! can-add? form-instance attr))
+      (div {:key (str k) :classes [(?! ref-container-class env)]}
+        (h3 :.ui.header title)
+        (button :.ui.primary.button {:onClick (fn [] (form/add-child! (assoc env
+                                                                             ::form/order :replace
+                                                                             ::form/parent-relation k
+                                                                             ::form/parent form-instance
+                                                                             ::form/child-class ui)))} (tr "Create"))))))
 
 (defsc NotebookCells [this {{::form/keys [form-instance master-form] :as env} :env
                             {k ::attr/qualified-key :as attr}                 :attribute
@@ -245,7 +260,7 @@
         state-map           (comp/component->state-map this)
         add                 (when (or (nil? add?) add?)
                               (dom/div
-                               (dom/button :.ui.green.plus.button
+                               (dom/button :.ui.green.tiny.button
                                            {:onClick (fn [evt]
                                                        (let [form-id-attr (comp/component-options ui ::form/id)
                                                              form-id-key (::attr/qualified-key form-id-attr)
@@ -254,14 +269,14 @@
                                                              new-entity-data {form-id-key new-id}
                                                              new-entity-data (if (nil? position-key) new-entity-data
                                                                                (let [cells (get-in state-map target [])
-                                                                                     pos (reduce (fn [min c-ident]
+                                                                                     pos (reduce (fn [res c-ident]
                                                                                                    (let [c-pos (get-in state-map (conj c-ident position-key) 0)]
-                                                                                                     (if (< c-pos min) c-pos min))) 10000 cells)]
+                                                                                                     (min c-pos res))) 10000 cells)]
                                                                                  (assoc new-entity-data position-key (- pos 1))))
                                                              new-entity (fs/add-form-config ui new-entity-data)]
                                                          (merge/merge-component! form-instance ui new-entity :prepend target)))
                                             } "Add at first")
-                               (dom/button :.ui.green.plus.button
+                               (dom/button :.ui.green.tiny.button
                                            {:onClick (fn [evt]
                                                        (let [form-id-attr (comp/component-options ui ::form/id)
                                                              form-id-key (::attr/qualified-key form-id-attr)
@@ -270,9 +285,9 @@
                                                              new-entity-data {form-id-key new-id}
                                                              new-entity-data (if (nil? position-key) new-entity-data
                                                                                (let [cells (get-in state-map target [])
-                                                                                     pos (reduce (fn [max c-ident]
+                                                                                     pos (reduce (fn [res c-ident]
                                                                                                    (let [c-pos (get-in state-map (conj c-ident position-key) 0)]
-                                                                                                     (if (> c-pos max) c-pos max))) -10000 cells)]
+                                                                                                     (max c-pos res))) -10000 cells)]
                                                                                  (assoc new-entity-data position-key (+ pos 1))))
                                                              new-entity (fs/add-form-config ui new-entity-data)]
                                                          (merge/merge-component! form-instance ui new-entity :append target)))
@@ -288,7 +303,7 @@
                    (ui-factory props
                                (merge
                                 env
-                                {::form/form-class      ui
+                                {::form/child-class      ui
                                  ::form/parent          form-instance
                                  ::form/parent-relation k
                                  ::form/can-delete?     (if delete? (?! delete? props) false)})))
