@@ -31,7 +31,7 @@
     :form-body-container {:default sui-form/standard-form-layout-renderer}
     :ref-container       {:default sui-form/standard-ref-container
                           :file    sui-form/file-ref-container
-                          :notebook-cell    sui-form/notebook-cell-ref-container}}
+                          }}
 
    :com.fulcrologic.rad.form/type->style->control
    {:text    {:default text-field/render-field}

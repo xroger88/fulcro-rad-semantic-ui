@@ -166,6 +166,7 @@
                                                        :width   "1px"
                                                        :height  "1px"
                                                        :opacity 0}
+                                            ;;:onClick #(log/debug "clicked" upload-id)
                                             :onChange (fn [evt]
                                                         ;; FIXME changed by xroger88 to support multiple file uploads
                                                         (let [attributes (comp/component-options ui ::form/attributes)
